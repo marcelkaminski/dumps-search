@@ -9,7 +9,7 @@ from search import SearchEngine
 from pdf_generator import PDFGenerator
 from pdf_merger import PDFMerger
 from logger import setup_logging, get_app_logger
-
+import json
 
 def main():
     parser = argparse.ArgumentParser(description="ExamTopics PDF Scraper")
@@ -81,20 +81,11 @@ def main():
         generated_pdfs = []
         pdf_failures = []
 
-        # Process each question in the range
-        for question_num in range(args.begin, args.end + 1):
-            logger.info(f"Processing question {question_num}...")
+        with open("filtered_links.json", "r", encoding="utf-8") as f:
+            links = json.load(f)
 
-            # Replace placeholders in title and keyword for current question
-            title = exam_config["title"].replace("#QUESTION", str(question_num))
-            keyword = exam_config["keyword"].replace("#QUESTION", str(question_num))
-
-            logger.debug(f"Question {question_num} - Title: {title}")
-            logger.debug(f"Question {question_num} - Keyword: {keyword}")
-
-            # Perform search for current question
-            result_url = search_engine.search_question(keyword, title, url_substring)
-
+        # Enumerate the links to get index and URL
+        for question_num, result_url in enumerate(links, start=1):
             if result_url:
                 successful_urls.append((question_num, result_url))
                 logger.info(f"SUCCESS: Found URL for question {question_num}")
@@ -120,101 +111,6 @@ def main():
                     f"FAILED: No valid URL found for question {question_num}"
                 )
 
-        # Log summary
-        logger.info(f"{'='*60}")
-        logger.info(f"PROCESSING SUMMARY")
-        logger.info(f"{'='*60}")
-        logger.info(f"Total questions processed: {args.end - args.begin + 1}")
-        logger.info(f"URLs found: {len(successful_urls)}")
-        logger.info(f"PDFs generated: {len(generated_pdfs)}")
-        logger.info(f"PDF generation failed: {len(pdf_failures)}")
-        logger.info(f"No URLs found: {len(failed_questions)}")
-
-        if generated_pdfs:
-            logger.info(f"SUCCESSFULLY GENERATED PDFs:")
-            for question_num, pdf_path in generated_pdfs:
-                logger.debug(f"  Question {question_num}: {pdf_path}")
-
-        if pdf_failures:
-            logger.info(f"PDF GENERATION FAILURES:")
-            for question_num, url in pdf_failures:
-                logger.debug(
-                    f"  Question {question_num}: Failed to generate PDF from {url}"
-                )
-
-        if failed_questions:
-            logger.info(f"NO URLs FOUND:")
-            for question_num in failed_questions:
-                logger.debug(f"  Question {question_num}: No valid URL found")
-
-        # Merge PDFs by default unless --no-merge is specified
-        if not args.no_merge and generated_pdfs:
-            logger.info("Starting PDF merge process...")
-            pdf_merger = PDFMerger()
-
-            try:
-                # Extract just the file paths from generated_pdfs
-                pdf_paths = [pdf_path for _, pdf_path in generated_pdfs]
-
-                # Create merged PDF filename
-                merged_filename = (
-                    f"{args.exam}_questions{args.begin}-{args.end}_merged.pdf"
-                )
-                merged_path = os.path.join(args.output, merged_filename)
-
-                logger.info(f"Merging {len(pdf_paths)} PDFs into: {merged_filename}")
-
-                # Perform the merge
-                merge_success = pdf_merger.merge_pdfs(pdf_paths, merged_path)
-
-                if merge_success:
-                    logger.info(f"{'='*60}")
-                    logger.info(f"PDF MERGE SUMMARY")
-                    logger.info(f"{'='*60}")
-                    logger.info(f"MERGE SUCCESS: Created {merged_filename}")
-                    logger.debug(f"  Location: {merged_path}")
-                    logger.debug(f"  Merged {len(pdf_paths)} individual PDFs")
-
-                    # Clean up individual PDFs if not keeping them
-                    if not args.keep_individual:
-                        logger.debug("Cleaning up individual PDF files...")
-                        cleanup_count = 0
-                        cleanup_failures = 0
-
-                        for _, pdf_path in generated_pdfs:
-                            try:
-                                if os.path.exists(pdf_path):
-                                    os.remove(pdf_path)
-                                    cleanup_count += 1
-                                    logger.debug(f"Removed individual PDF: {pdf_path}")
-                            except Exception as e:
-                                cleanup_failures += 1
-                                logger.warning(f"Failed to remove {pdf_path}: {str(e)}")
-
-                        logger.debug(
-                            f"  Cleaned up {cleanup_count} individual PDF files"
-                        )
-                        if cleanup_failures > 0:
-                            logger.warning(
-                                f"  Failed to clean up {cleanup_failures} files"
-                            )
-                    else:
-                        logger.debug(f"  Individual PDF files preserved")
-
-                else:
-                    logger.error(f"MERGE FAILED: Could not create merged PDF")
-                    logger.error("PDF merge operation failed")
-
-            except Exception as e:
-                logger.error(f"PDF merge error: {str(e)}")
-                logger.error(f"MERGE ERROR: {str(e)}")
-            finally:
-                # Clean up any temporary files created by the merger
-                pdf_merger.cleanup_temp_files()
-
-        elif not args.no_merge and not generated_pdfs:
-            logger.warning("PDF merge enabled but no PDFs were generated")
-            logger.warning("MERGE SKIPPED: No PDFs available to merge")
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")

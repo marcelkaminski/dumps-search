@@ -19,7 +19,7 @@ class SearchEngine:
     def search_question(
         self, keyword: str, title: str, url_substring: str
     ) -> Optional[str]:
-        # Construct advanced search query using DuckDuckGo syntax
+        # Construct an advanced search query using DuckDuckGo syntax
         search_query = f'site:examtopics.com intitle:{title} "{keyword}"'
 
         self.logger.debug(f"Searching with query: {search_query}")
@@ -54,9 +54,9 @@ class SearchEngine:
                 results = list(
                     DDGS().text(
                         query,
-                        max_results=self.max_results,
+                        max_results=1,
                         safesearch="off",
-                        backend="google",
+                        backend='auto'
                     )
                 )
 

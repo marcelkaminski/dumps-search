@@ -78,7 +78,7 @@ class ConfigManager:
         if not self.config:
             self.load_config()
 
-        return self.config.get("log_level", "info")
+        return self.config.get("log_level", "debug")
 
     def list_available_exams(self) -> list:
         if not self.config:
